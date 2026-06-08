@@ -1,15 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { QuotationController } from './quotation.controller';
+import { ProductsController } from './products.controller';
 
-describe('QuotationController', () => {
-  let controller: QuotationController;
+describe('ProductsController', () => {
+  let controller: ProductsController;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [QuotationController],
+      controllers: [ProductsController],
     }).compile();
 
-    controller = module.get<QuotationController>(QuotationController);
+    controller = module.get<ProductsController>(ProductsController);
   });
 
   it('should be defined', () => {

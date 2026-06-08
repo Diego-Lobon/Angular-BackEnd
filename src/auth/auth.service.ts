@@ -1,38 +1,51 @@
-// Injectable permite que NestJS pueda inyectar esta clase
-// en otras partes de la aplicación.
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 
-// Servicio para crear y verificar tokens JWT.
 import { JwtService } from '@nestjs/jwt';
+
+import { InjectRepository } from '@nestjs/typeorm';
+
+import { Repository } from 'typeorm';
+
+import * as bcrypt from 'bcrypt';
+
+import { User } from './entities/auth.entity';
 
 @Injectable()
 export class AuthService {
-  // NestJS inyecta automáticamente JwtService
-  // gracias a la inyección de dependencias.
-  constructor(private jwtService: JwtService) {}
+  constructor(
+    private jwtService: JwtService,
 
-  // Método encargado de iniciar sesión.
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
+  ) {}
+
   async login(username: string, password: string) {
-    // USUARIO PRUEBA
-    // Validación simple de usuario y contraseña.
-    // Aquí normalmente consultarías una base de datos.
-    if (username !== 'admin' || password !== '123456') {
-      // Lanza un error HTTP 401 Unauthorized.
-      throw new UnauthorizedException('Credenciales incorrectas');
+    const user = await this.userRepository.findOne({
+      where: {
+        username,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Usuario no existe');
     }
 
-    // PAYLOAD JWT
-    // Información que será almacenada dentro del JWT.
-    // No es recomendable guardar contraseñas aquí.
+    const isValid = await bcrypt.compare(
+      password, // contraseña enviada desde Angular
+      user.password, // hash guardado en MySQL
+    );
+
+    if (!isValid) {
+      throw new UnauthorizedException('Contraseña incorrecta');
+    }
+
     const payload = {
-      username,
+      id: user.id,
+      username: user.username,
     };
 
-    // TOKEN
-    // Genera un token JWT firmado con la clave secreta.
     const token = await this.jwtService.signAsync(payload);
 
-    // Devuelve el token al cliente.
     return {
       access_token: token,
     };

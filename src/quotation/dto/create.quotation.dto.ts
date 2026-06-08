@@ -1,17 +1,27 @@
 import { IsArray, IsNumber, IsString } from 'class-validator';
 
+// * Representa un producto individual
 export class ProductDto {
+  // * Nombre del producto
   @IsString()
-  name!: string;
+  referencia_interna!: string;
 
-  @IsNumber()
-  price!: number;
+  // * Nombre del producto
+  @IsString()
+  nombre!: string;
 
+  // * Precio unitario
   @IsNumber()
-  cant!: number;
+  precio_venta!: number;
+
+  // * Cantidad
+  @IsNumber()
+  cantidad!: number;
 }
 
+// * Representa toda la cotización
 export class CreateQuotationDto {
+  // * Lista de productos
   @IsArray()
   products!: ProductDto[];
 }
