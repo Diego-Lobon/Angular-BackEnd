@@ -16,6 +16,7 @@ export class ProductsService {
     return this.productRepository.find({
       relations: {
         categoria: true,
+        marca: true,
       },
     });
   }

@@ -1,17 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Marca } from 'src/products/entities/marca.entity';
 import { Repository } from 'typeorm';
-import { Category } from 'src/products/entities/category.entity';
 
 @Injectable()
-export class CategoryService {
+export class MarcaService {
   constructor(
-    @InjectRepository(Category)
-    private categoryRepository: Repository<Category>,
+    @InjectRepository(Marca)
+    private marcaRepository: Repository<Marca>,
   ) {}
 
   findAll() {
-    return this.categoryRepository.find({
+    return this.marcaRepository.find({
       order: {
         nombre: 'ASC',
       },

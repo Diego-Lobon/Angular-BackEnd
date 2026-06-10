@@ -7,6 +7,7 @@ import {
 } from 'typeorm';
 
 import { Category } from '../../products/entities/category.entity';
+import { Marca } from '../../products/entities/marca.entity';
 
 @Entity('productos')
 export class Product {
@@ -25,11 +26,11 @@ export class Product {
   @Column('decimal')
   costo!: number;
 
-  @Column()
-  marca!: string;
+  @Column('decimal')
+  precio_venta_dolares!: number;
 
   @Column('decimal')
-  precio_venta!: number;
+  precio_venta_soles!: number;
 
   @Column()
   unidad_medida!: string;
@@ -42,4 +43,10 @@ export class Product {
     name: 'categoria_id',
   })
   categoria!: Category;
+
+  @ManyToOne(() => Marca)
+  @JoinColumn({
+    name: 'marca_id',
+  })
+  marca!: Marca;
 }
