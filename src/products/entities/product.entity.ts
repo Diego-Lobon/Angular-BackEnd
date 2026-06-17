@@ -24,7 +24,10 @@ export class Product {
   nombre!: string;
 
   @Column('decimal')
-  costo!: number;
+  costo_dolares!: number;
+
+  @Column('decimal')
+  costo_soles!: number;
 
   @Column('decimal')
   precio_venta_dolares!: number;

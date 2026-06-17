@@ -19,18 +19,27 @@ export class QuotationService {
   // * product: ProducDTO[]. Con esta información se construirá la cotización.
   // * res para devolver la respuesta al navegador
   // * void significa que no devolvemos ningun valor, ya que usaremos res
-  generatePdf(products: ProductDto[], res: Response): void {
+  generatePdf(
+    products: ProductDto[],
+    res: Response,
+    moneda: string,
+    username?: string,
+    idPrecioLista?: number,
+  ): void {
     // =========================
     // TOTAL
     // =========================
+
+    // 💡 Determinamos el símbolo de la moneda dinámicamente
+    const esDolar = moneda?.toUpperCase().trim() === 'USD';
+    const simbolo = esDolar ? '$' : 'S/';
+    const fechaActual = new Date().toLocaleDateString('es-PE');
 
     const subtotal = products.reduce(
       (sum, item) => sum + item.precio_venta * item.cantidad,
       0,
     );
-
     const igv = subtotal * 0.18;
-
     const total = subtotal + igv;
 
     // =========================
@@ -78,7 +87,7 @@ export class QuotationService {
 
     doc.text('Cotizar a:', 50, 160);
 
-    doc.font('Helvetica-Bold').text('Empresa ISUR SAC', 120, 160);
+    doc.font('Helvetica-Bold').text(String(username), 120, 160);
 
     doc.font('Helvetica').text('Correo:', 50, 180);
 
@@ -86,7 +95,11 @@ export class QuotationService {
 
     doc.font('Helvetica').text('Fecha:', 400, 160);
 
-    doc.font('Helvetica-Bold').text('22/05/2026', 450, 160);
+    doc.font('Helvetica-Bold').text(fechaActual, 450, 160);
+
+    doc.font('Helvetica').text('ID:', 400, 180);
+
+    doc.font('Helvetica-Bold').text(String(idPrecioLista), 450, 180);
 
     // =========================
     // TABLA
@@ -180,7 +193,7 @@ export class QuotationService {
       // =========================
 
       doc.text(
-        `S/ ${Number(product.precio_venta).toFixed(2)}`,
+        `${simbolo} ${Number(product.precio_venta).toFixed(2)}`,
         priceX,
         positionY + 10,
         {
@@ -208,7 +221,7 @@ export class QuotationService {
       // TOTAL
       // =========================
 
-      doc.text(`S/ ${rowTotal.toFixed(2)}`, totalX, positionY + 10, {
+      doc.text(`${simbolo} ${rowTotal.toFixed(2)}`, totalX, positionY + 10, {
         width: totalWidth,
       });
 
@@ -239,11 +252,11 @@ export class QuotationService {
 
     doc.text('Sub Total:', 380, totalsY);
 
-    doc.text(`S/ ${subtotal.toFixed(2)}`, 480, totalsY);
+    doc.text(`${simbolo} ${subtotal.toFixed(2)}`, 480, totalsY);
 
     doc.text('IGV (18%):', 380, totalsY + 25);
 
-    doc.text(`S/ ${igv.toFixed(2)}`, 480, totalsY + 25);
+    doc.text(`${simbolo} ${igv.toFixed(2)}`, 480, totalsY + 25);
 
     doc
       .moveTo(380, totalsY + 50)
@@ -256,7 +269,7 @@ export class QuotationService {
 
     doc.text('Total:', 380, totalsY + 60);
 
-    doc.text(`S/ ${total.toFixed(2)}`, 480, totalsY + 60);
+    doc.text(`${simbolo} ${total.toFixed(2)}`, 480, totalsY + 60);
 
     // =========================
     // FOOTER
@@ -275,18 +288,27 @@ export class QuotationService {
     doc.end();
   }
 
-  generatePdfValid(products: ProductDto[], res: Response): void {
+  generatePdfValid(
+    products: ProductDto[],
+    res: Response,
+    moneda: string,
+    username?: string,
+    idPrecioLista?: number,
+  ): void {
     // =========================
     // TOTAL
     // =========================
+
+    // 💡 Determinamos el símbolo de la moneda dinámicamente
+    const esDolar = moneda?.toUpperCase().trim() === 'USD';
+    const simbolo = esDolar ? '$' : 'S/';
+    const fechaActual = new Date().toLocaleDateString('es-PE');
 
     const subtotal = products.reduce(
       (sum, item) => sum + item.precio_venta * item.cantidad,
       0,
     );
-
     const igv = subtotal * 0.18;
-
     const total = subtotal + igv;
 
     // =========================
@@ -332,9 +354,9 @@ export class QuotationService {
 
     doc.fontSize(11).fillColor('black');
 
-    doc.text('Cotizar a:', 50, 160);
+    doc.text('Cotizar a: ', 50, 160);
 
-    doc.font('Helvetica-Bold').text('Empresa ISUR SAC', 120, 160);
+    doc.font('Helvetica-Bold').text(String(username), 120, 160);
 
     doc.font('Helvetica').text('Correo:', 50, 180);
 
@@ -342,7 +364,11 @@ export class QuotationService {
 
     doc.font('Helvetica').text('Fecha:', 400, 160);
 
-    doc.font('Helvetica-Bold').text('22/05/2026', 450, 160);
+    doc.font('Helvetica-Bold').text(fechaActual, 450, 160);
+
+    doc.font('Helvetica').text('ID:', 400, 180);
+
+    doc.font('Helvetica-Bold').text(String(idPrecioLista), 450, 180);
 
     // =========================
     // TABLA
@@ -448,7 +474,7 @@ export class QuotationService {
       // =========================
 
       doc.text(
-        `S/ ${Number(product.precio_venta).toFixed(2)}`,
+        `${simbolo} ${Number(product.precio_venta).toFixed(2)}`,
         priceX,
         positionY + 10,
         {
@@ -476,7 +502,7 @@ export class QuotationService {
       // TOTAL
       // =========================
 
-      doc.text(`S/ ${rowTotal.toFixed(2)}`, totalX, positionY + 10, {
+      doc.text(`${simbolo} ${rowTotal.toFixed(2)}`, totalX, positionY + 10, {
         width: totalWidth,
       });
 
@@ -507,11 +533,11 @@ export class QuotationService {
 
     doc.text('Sub Total:', 380, totalsY);
 
-    doc.text(`S/ ${subtotal.toFixed(2)}`, 480, totalsY);
+    doc.text(`${simbolo} ${subtotal.toFixed(2)}`, 480, totalsY);
 
     doc.text('IGV (18%):', 380, totalsY + 25);
 
-    doc.text(`S/ ${igv.toFixed(2)}`, 480, totalsY + 25);
+    doc.text(`${simbolo} ${igv.toFixed(2)}`, 480, totalsY + 25);
 
     doc
       .moveTo(380, totalsY + 50)
@@ -524,7 +550,7 @@ export class QuotationService {
 
     doc.text('Total:', 380, totalsY + 60);
 
-    doc.text(`S/ ${total.toFixed(2)}`, 480, totalsY + 60);
+    doc.text(`${simbolo} ${total.toFixed(2)}`, 480, totalsY + 60);
 
     // =========================
     // FOOTER

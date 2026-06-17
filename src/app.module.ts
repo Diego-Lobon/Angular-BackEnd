@@ -7,6 +7,8 @@ import { CategoryModule } from './category/category.module';
 import { RedisModule } from './redis/redis.module';
 import { CartModule } from './cart/cart.module';
 import { MarcaModule } from './marca/marca.module';
+import { ClientesModule } from './clientes/clientes.module';
+import { AuthclientesModule } from './authclientes/authclientes.module';
 
 @Module({
   imports: [
@@ -34,6 +36,10 @@ import { MarcaModule } from './marca/marca.module';
     CartModule,
 
     MarcaModule,
+
+    ClientesModule,
+
+    AuthclientesModule,
   ],
 })
 export class AppModule {}

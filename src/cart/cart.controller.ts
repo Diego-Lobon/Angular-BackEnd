@@ -1,29 +1,55 @@
-import { Controller, Get, Post, Body, Param, Delete } from '@nestjs/common';
-import { RedisService } from '../redis/redis.service';
+import { Controller, Get, Post, Delete, Body, Param } from '@nestjs/common';
+import { CartService, CartProduct } from './cart.service';
 
 @Controller('cart')
 export class CartController {
-  constructor(private readonly redisService: RedisService) {}
+  constructor(private readonly cartService: CartService) {}
 
-  private getRedisKey(cartId: string): string {
-    return `cart:${cartId}`;
+  // ========================
+  // CARRITO ANÓNIMO
+  // ========================
+
+  @Get('anonymous/:sessionId')
+  getAnonymousCart(
+    @Param('sessionId') sessionId: string,
+  ): Promise<CartProduct[]> {
+    return this.cartService.getAnonymousCart(sessionId);
   }
 
-  @Get(':cartId')
-  async getCart(@Param('cartId') cartId: string) {
-    const cart = await this.redisService.get(this.getRedisKey(cartId));
-    return cart ? cart : [];
+  @Post('anonymous/:sessionId')
+  async saveAnonymousCart(
+    @Param('sessionId') sessionId: string,
+    @Body() cart: CartProduct[],
+  ): Promise<CartProduct[]> {
+    await this.cartService.saveAnonymousCart(sessionId, cart);
+
+    return cart;
   }
 
-  @Post(':cartId')
-  async saveCart(@Param('cartId') cartId: string, @Body() cartItems: any[]) {
-    await this.redisService.set(this.getRedisKey(cartId), cartItems);
-    return { success: true, message: 'Carrito sincronizado en Redis' };
+  @Delete('anonymous/:sessionId')
+  clearAnonymous(@Param('sessionId') sessionId: string): Promise<void> {
+    return this.cartService.clearAnonymousCart(sessionId);
   }
 
-  @Delete(':cartId')
-  async clearCart(@Param('cartId') cartId: string) {
-    await this.redisService.del(this.getRedisKey(cartId));
-    return { success: true, message: 'Carrito eliminado de Redis' };
+  // ========================
+  // CARRITO LOGUEADO
+  // ========================
+
+  @Get('user/:userId')
+  getUserCart(@Param('userId') userId: string): Promise<CartProduct[]> {
+    return this.cartService.getAuthenticatedCart(userId);
+  }
+
+  @Post('user/:userId')
+  saveUserCart(
+    @Param('userId') userId: string,
+    @Body() cart: CartProduct[],
+  ): Promise<void> {
+    return this.cartService.saveAuthenticatedCart(userId, cart);
+  }
+
+  @Delete('user/:userId')
+  clearUser(@Param('userId') userId: string): Promise<void> {
+    return this.cartService.saveAuthenticatedCart(userId, []);
   }
 }

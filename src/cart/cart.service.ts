@@ -1,21 +1,35 @@
 import { Injectable } from '@nestjs/common';
 import { RedisService } from '../redis/redis.service';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { CartItem } from './entities/cart.entity';
 
-interface CartProduct {
+export interface CartProduct {
+  referencia_interna?: string;
+
   productId: string;
-  quantity: number;
+
+  name?: string;
+
+  price_dolares?: number;
+
+  price_soles?: number;
+
+  moneda?: 'USD' | 'PEN';
+
+  cantidad: number;
+
+  imageUrl?: string;
+
+  marca?: {
+    nombre: string;
+  };
+
+  categoria?: {
+    nombre: string;
+  };
 }
 
 @Injectable()
 export class CartService {
-  constructor(
-    private readonly redisService: RedisService,
-    @InjectRepository(CartItem)
-    private cartItemRepository: Repository<CartItem>,
-  ) {}
+  constructor(private readonly redisService: RedisService) {}
 
   // --- Métodos para Carritos Anónimos (Redis Simplificado) ---
   async getAnonymousCart(sessionId: string): Promise<CartProduct[]> {
@@ -31,24 +45,25 @@ export class CartService {
     product: CartProduct,
   ): Promise<CartProduct[]> {
     const currentCart = await this.getAnonymousCart(sessionId);
-    const existingItemIndex = currentCart.findIndex(
+
+    const existingItem = currentCart.find(
       (item) => item.productId === product.productId,
     );
 
-    if (existingItemIndex > -1) {
-      currentCart[existingItemIndex].quantity = product.quantity;
+    if (existingItem) {
+      existingItem.cantidad = product.cantidad;
     } else {
       currentCart.push(product);
     }
 
-    const updatedCart = currentCart.filter((item) => item.quantity > 0);
+    const updatedCart = currentCart.filter((item) => item.cantidad > 0);
 
-    // Usamos nuestro método .set() limpio pasándole los segundos al final (7 días)
     await this.redisService.set(
       `anonymous_cart:${sessionId}`,
       updatedCart,
-      60 * 60 * 24 * 7,
+      604800,
     );
+
     return updatedCart;
   }
 
@@ -73,47 +88,18 @@ export class CartService {
 
   // --- Métodos para Carritos Autenticados (MySQL + Caché de Redis) ---
   async getAuthenticatedCart(userId: string): Promise<CartProduct[]> {
-    // Intentamos buscar en la caché de Redis primero
-    const cachedCart = await this.redisService.get<CartProduct[]>(
+    const cart = await this.redisService.get<CartProduct[]>(
       `user_cart:${userId}`,
     );
-    if (cachedCart) {
-      return cachedCart;
-    }
 
-    // Si no está, vamos a MySQL
-    const dbCartItems = await this.cartItemRepository.find({
-      where: { userId },
-    });
-
-    const cart = dbCartItems.map((item) => ({
-      productId: item.productId,
-      quantity: item.quantity,
-    }));
-
-    // Guardamos en la caché de Redis por 1 día (86400 segundos)
-    await this.redisService.set(`user_cart:${userId}`, cart, 60 * 60 * 24);
-    return cart;
+    return cart || [];
   }
 
   async saveAuthenticatedCart(
     userId: string,
     cart: CartProduct[],
   ): Promise<void> {
-    // Sincronización en MySQL
-    await this.cartItemRepository.delete({ userId });
-
-    const newCartItems = cart.map((item) =>
-      this.cartItemRepository.create({
-        userId,
-        productId: item.productId,
-        quantity: item.quantity,
-      }),
-    );
-    await this.cartItemRepository.save(newCartItems);
-
-    // Actualizamos la caché en Redis por 1 día
-    await this.redisService.set(`user_cart:${userId}`, cart, 60 * 60 * 24);
+    await this.redisService.set(`user_cart:${userId}`, cart, 604800);
   }
 
   // --- Lógica de Fusión de Carritos ---
@@ -122,22 +108,33 @@ export class CartService {
     anonymousCart: CartProduct[],
     authenticatedCart: CartProduct[],
   ): CartProduct[] {
-    // <-- Cambiado de Promise<CartProduct[]> a CartProduct[]
-    const mergedCartMap = new Map<string, CartProduct>();
+    const merged = new Map<string, CartProduct>();
 
     authenticatedCart.forEach((item) => {
-      mergedCartMap.set(item.productId, { ...item });
+      merged.set(item.productId, {
+        ...item,
+      });
     });
 
-    anonymousCart.forEach((anonItem) => {
-      const existingItem = mergedCartMap.get(anonItem.productId);
-      if (existingItem) {
-        existingItem.quantity += anonItem.quantity;
+    anonymousCart.forEach((anon) => {
+      const existing = merged.get(anon.productId);
+
+      if (existing) {
+        existing.cantidad += anon.cantidad;
       } else {
-        mergedCartMap.set(anonItem.productId, { ...anonItem });
+        merged.set(anon.productId, {
+          ...anon,
+        });
       }
     });
 
-    return Array.from(mergedCartMap.values());
+    return Array.from(merged.values());
+  }
+
+  async saveAnonymousCart(
+    sessionId: string,
+    cart: CartProduct[],
+  ): Promise<void> {
+    await this.redisService.set(`anonymous_cart:${sessionId}`, cart, 604800);
   }
 }
