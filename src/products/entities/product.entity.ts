@@ -15,9 +15,6 @@ export class Product {
   id!: number;
 
   @Column()
-  id_migracion!: string;
-
-  @Column()
   referencia_interna!: string;
 
   @Column()

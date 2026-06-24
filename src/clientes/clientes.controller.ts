@@ -1,5 +1,6 @@
 import { Controller, Get, Param, Delete, Patch, Body } from '@nestjs/common';
 import { ClientesService } from './clientes.service';
+import { Cliente } from './entities/cliente.entity';
 
 @Controller('clientes')
 export class ClientesController {
@@ -30,5 +31,11 @@ export class ClientesController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.clientesService.remove(Number(id));
+  }
+
+  // ACTUALIZAR TODOS LOS DATOS DEL CLIENTE
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() updateClienteDto: Partial<Cliente>) {
+    return this.clientesService.update(Number(id), updateClienteDto);
   }
 }

@@ -1,570 +1,556 @@
-// * @Injectable() le dice a NestJS que esta clase es un servicio.
+// src/quotation/quotation.service.ts
 import { Injectable } from '@nestjs/common';
-
-// * Response representa la respuesta que enviaremos al navegador.
 import type { Response } from 'express';
-
-// * Esto ayuda a TypeScript a saber qué datos esperamos.
 import { ProductDto } from './dto/create.quotation.dto';
-
-// * PDFKit es una librería que permite crear PDFs desde código.
 import PDFDocument from 'pdfkit';
+import { SaveQuotationDto } from './dto/save-quotation.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Cotizacion } from './entities/cotizacion.entity';
+import * as fs from 'fs';
+import * as path from 'path';
 
-// * @Injectable() convierte esta clase en un Service.
+import { v4 as uuidv4 } from 'uuid'; // Importa esto al inicio
+
 @Injectable()
-// * Creamos la clase QuotationService.
-// * Esta clase será utilizada por el Controller.
 export class QuotationService {
-  // * Método encargado de generar el PDF.
-  // * product: ProducDTO[]. Con esta información se construirá la cotización.
-  // * res para devolver la respuesta al navegador
-  // * void significa que no devolvemos ningun valor, ya que usaremos res
-  generatePdf(
-    products: ProductDto[],
-    res: Response,
-    moneda: string,
-    username?: string,
-    idPrecioLista?: number,
-  ): void {
-    // =========================
-    // TOTAL
-    // =========================
+  constructor(
+    @InjectRepository(Cotizacion)
+    private readonly cotizacionRepository: Repository<Cotizacion>,
+  ) {}
 
-    // 💡 Determinamos el símbolo de la moneda dinámicamente
-    const esDolar = moneda?.toUpperCase().trim() === 'USD';
-    const simbolo = esDolar ? '$' : 'S/';
-    const fechaActual = new Date().toLocaleDateString('es-PE');
-
-    const subtotal = products.reduce(
-      (sum, item) => sum + item.precio_venta * item.cantidad,
-      0,
-    );
-    const igv = subtotal * 0.18;
-    const total = subtotal + igv;
-
-    // =========================
-    // PDF
-    // =========================
-
-    const doc = new PDFDocument({
-      margin: 50,
-      size: 'A4',
+  async deleteQuotation(id: number): Promise<boolean> {
+    const cotizacion = await this.cotizacionRepository.findOne({
+      where: { id },
     });
 
-    // =========================
-    // HEADERS
-    // =========================
-
-    res.setHeader('Content-Type', 'application/pdf');
-
-    res.setHeader('Content-Disposition', 'inline; filename=cotizacion.pdf');
-
-    doc.pipe(res);
-
-    // =========================
-    // LOGO
-    // =========================
-
-    doc.image('public/assets/logo/logo-isur.png', 50, 40, {
-      width: 120,
-    });
-
-    // =========================
-    // TITULO DERECHA
-    // =========================
-
-    doc.fontSize(28).fillColor('#1E3A5F').text('COTIZACIÓN', 350, 55, {
-      align: 'right',
-    });
-
-    // =========================
-    // INFO CLIENTE
-    // =========================
-
-    doc.moveTo(50, 140).lineTo(545, 140).strokeColor('#D1D5DB').stroke();
-
-    doc.fontSize(11).fillColor('black');
-
-    doc.text('Cotizar a:', 50, 160);
-
-    doc.font('Helvetica-Bold').text(String(username), 120, 160);
-
-    doc.font('Helvetica').text('Correo:', 50, 180);
-
-    doc.font('Helvetica-Bold').text('ventas@isur.com', 120, 180);
-
-    doc.font('Helvetica').text('Fecha:', 400, 160);
-
-    doc.font('Helvetica-Bold').text(fechaActual, 450, 160);
-
-    doc.font('Helvetica').text('ID:', 400, 180);
-
-    doc.font('Helvetica-Bold').text(String(idPrecioLista), 450, 180);
-
-    // =========================
-    // TABLA
-    // =========================
-
-    const tableTop = 240;
-
-    const itemX = 50;
-    const descriptionX = 110;
-    const priceX = 230;
-    const cantX = 330;
-    const impX = 400;
-    const totalX = 480;
-
-    // =========================
-    // HEADER TABLA
-    // =========================
-
-    doc.rect(50, tableTop, 495, 30).fill('#1E3A5F');
-
-    doc.fillColor('white').fontSize(11).font('Helvetica-Bold');
-
-    doc.text('Item', itemX + 15, tableTop + 10);
-
-    doc.text('Descripcion', descriptionX, tableTop + 10);
-
-    doc.text('Precio Unitario', priceX, tableTop + 10);
-
-    doc.text('cant', cantX, tableTop + 10);
-
-    doc.text('Impuestos', impX, tableTop + 10);
-
-    doc.text('Total', totalX, tableTop + 10);
-
-    // =========================
-    // FILAS PRODUCTOS
-    // =========================
-
-    let positionY = tableTop + 30;
-
-    doc.font('Helvetica');
-    doc.fillColor('black');
-
-    const descriptionWidth = 100;
-    const priceWidth = 70;
-    const cantWidth = 50;
-    const impWidth = 60;
-    const totalWidth = 70;
-
-    products.forEach((product, index) => {
-      const rowTotal = product.precio_venta * product.cantidad;
-
-      // =========================
-      // CALCULAR ALTURA DESCRIPCIÓN
-      // =========================
-
-      const descriptionHeight = doc.heightOfString(product.nombre, {
-        width: descriptionWidth,
-      });
-
-      // ALTURA MINIMA FILA
-
-      const rowHeight = Math.max(40, descriptionHeight + 20);
-
-      // =========================
-      // LINEA SUPERIOR
-      // =========================
-
-      doc
-        .moveTo(50, positionY)
-        .lineTo(545, positionY)
-        .strokeColor('#E5E7EB')
-        .stroke();
-
-      // =========================
-      // ITEM
-      // =========================
-
-      doc.text(`${index + 1}`, itemX + 20, positionY + 10);
-
-      // =========================
-      // DESCRIPCION
-      // =========================
-
-      doc.text(product.nombre, descriptionX, positionY + 10, {
-        width: descriptionWidth,
-      });
-
-      // =========================
-      // PRECIO
-      // =========================
-
-      doc.text(
-        `${simbolo} ${Number(product.precio_venta).toFixed(2)}`,
-        priceX,
-        positionY + 10,
-        {
-          width: priceWidth,
-        },
-      );
-
-      // =========================
-      // cant
-      // =========================
-
-      doc.text(`${product.cantidad}`, cantX, positionY + 10, {
-        width: cantWidth,
-      });
-
-      // =========================
-      // IMPUESTOS
-      // =========================
-
-      doc.text(`IGV-18%`, impX, positionY + 10, {
-        width: impWidth,
-      });
-
-      // =========================
-      // TOTAL
-      // =========================
-
-      doc.text(`${simbolo} ${rowTotal.toFixed(2)}`, totalX, positionY + 10, {
-        width: totalWidth,
-      });
-
-      // =========================
-      // SIGUIENTE FILA
-      // =========================
-
-      positionY += rowHeight;
-    });
-
-    // =========================
-    // LINEA FINAL TABLA
-    // =========================
-
-    doc
-      .moveTo(50, positionY)
-      .lineTo(545, positionY)
-      .strokeColor('#E5E7EB')
-      .stroke();
-
-    // =========================
-    // TOTALES
-    // =========================
-
-    const totalsY = positionY + 40;
-
-    doc.font('Helvetica').fontSize(11);
-
-    doc.text('Sub Total:', 380, totalsY);
-
-    doc.text(`${simbolo} ${subtotal.toFixed(2)}`, 480, totalsY);
-
-    doc.text('IGV (18%):', 380, totalsY + 25);
-
-    doc.text(`${simbolo} ${igv.toFixed(2)}`, 480, totalsY + 25);
-
-    doc
-      .moveTo(380, totalsY + 50)
-      .lineTo(545, totalsY + 50)
-      .strokeColor('#D1D5DB')
-      .lineWidth(1)
-      .stroke();
-
-    doc.font('Helvetica-Bold').fontSize(14);
-
-    doc.text('Total:', 380, totalsY + 60);
-
-    doc.text(`${simbolo} ${total.toFixed(2)}`, 480, totalsY + 60);
-
-    // =========================
-    // FOOTER
-    // =========================
-
-    doc.fontSize(10).font('Helvetica').fillColor('#6B7280');
-
-    doc.text('Gracias por su preferencia.', 50, 720);
-
-    doc.text('ISUR - Sistemas de Cotización', 50, 740);
-
-    // =========================
-    // FINALIZAR
-    // =========================
-
-    doc.end();
+    if (!cotizacion) throw new Error('Cotización no encontrada');
+
+    // 1. Eliminar archivo físico si existe
+    if (cotizacion.pdf_url) {
+      // Asumiendo que pdf_url empieza con /uploads/...
+      // process.cwd() obtiene la raíz del proyecto
+      const filePath = path.join(process.cwd(), cotizacion.pdf_url);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    // 2. Eliminar registro en base de datos
+    await this.cotizacionRepository.delete(id);
+    return true;
   }
 
-  generatePdfValid(
+  async findByPdfName(filename: string) {
+    // Buscamos en la base de datos donde la columna pdf_url contenga este archivo
+    const fullPath = `/public/uploads/pdf/${filename}`;
+    const cotizacion = await this.cotizacionRepository.findOne({
+      where: { pdf_url: fullPath },
+      relations: { cliente: true },
+    });
+
+    if (!cotizacion) throw new Error('Cotización no encontrada');
+    return cotizacion;
+  }
+
+  async findAll() {
+    try {
+      const cotizaciones = await this.cotizacionRepository.find({
+        relations: { cliente: true },
+        order: { fecha_creacion: 'DESC' },
+      });
+
+      return {
+        success: true,
+        data: cotizaciones.map((cot) => ({
+          id: cot.id,
+          numero_cotizacion: cot.numero_cotizacion,
+          // 💡 AQUÍ ESTABAN FALTANDO:
+          tipo_documento: cot.tipo_documento,
+          numero_documento: cot.numero_documento,
+          razon_social: cot.razon_social,
+          // Mantenemos la relación como la tenías
+          cliente: cot.cliente
+            ? { nombre: cot.cliente.nombre }
+            : { nombre: 'Publico General' },
+          fecha_creacion: cot.fecha_creacion,
+          estado: cot.estado,
+          pdf_url: cot.pdf_url,
+        })),
+      };
+    } catch (error: any) {
+      throw new Error(`Error al listar: ${error.message}`);
+    }
+  }
+
+  // src/quotation/quotation.service.ts
+  // src/quotation/quotation.service.ts
+
+  async saveQuotation(
+    data: SaveQuotationDto,
+  ): Promise<Cotizacion & { full_pdf_url: string }> {
+    // 1. Instanciamos la clase explícitamente para que TS sepa que es 1 objeto
+    const nuevaCotizacion = new Cotizacion();
+
+    // 2. Asignación directa con casteo de seguridad para la relación
+    nuevaCotizacion.cliente = data.id_cliente
+      ? ({ id: data.id_cliente } as any)
+      : null;
+    nuevaCotizacion.tipo_documento = data.tipo_documento;
+    nuevaCotizacion.numero_documento = data.numero_documento;
+    nuevaCotizacion.razon_social = data.razon_social;
+    nuevaCotizacion.solicitante = data.solicitante || null;
+    nuevaCotizacion.estado = 'PROCESO';
+    nuevaCotizacion.pdf_url = null;
+    nuevaCotizacion.numero_cotizacion = null;
+
+    // 3. Guardamos y obligamos a TS a tratar la respuesta como objeto Cotizacion
+    const cotizacionGuardada: Cotizacion =
+      await this.cotizacionRepository.save(nuevaCotizacion);
+
+    // 4. Preparar ruta del archivo
+    const randomHash = uuidv4();
+    const fileName = `cotizacion_${randomHash}.pdf`;
+    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'pdf');
+    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+    const filePath = path.join(uploadDir, fileName);
+
+    // 5. Cálculo del número oficial usando el ID obtenido del save
+    const numeroOficial = `COT-${String(cotizacionGuardada.id).padStart(5, '0')}-${String(data.id_precio_lista || '00').padStart(2, '0')}`;
+
+    // 6. Generación del PDF
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const writeStream = fs.createWriteStream(filePath);
+        this.generatePdf(
+          data.products,
+          writeStream,
+          'PEN',
+          data.razon_social,
+          data.id_precio_lista,
+          data.tipo_documento,
+          data.numero_documento,
+          data.direccion,
+          data.email,
+          data.solicitante,
+          numeroOficial,
+        );
+        writeStream.on('finish', () => resolve());
+        writeStream.on('error', (err) => reject(err));
+      });
+    } catch (err) {
+      throw new Error('No se pudo generar el archivo físico del PDF');
+    }
+
+    // 7. Actualización final
+    cotizacionGuardada.pdf_url = `/uploads/pdf/${fileName}`;
+    cotizacionGuardada.numero_cotizacion = numeroOficial;
+
+    const cotizacionFinal =
+      await this.cotizacionRepository.save(cotizacionGuardada);
+    return {
+      ...cotizacionFinal,
+      // Agregamos la URL completa para que el frontend no tenga que adivinar
+      full_pdf_url: `http://192.168.18.38:3000${cotizacionFinal.pdf_url}`,
+    };
+  }
+
+  generatePdf(
     products: ProductDto[],
-    res: Response,
+    res: any,
     moneda: string,
     username?: string,
     idPrecioLista?: number,
+    tipoDocumento?: string,
+    numeroDocumento?: string,
+    direccion?: string,
+    email?: string,
+    solicitante?: string,
+    nroCotizacionPersonalizado?: string, // 💡 Nuevo parámetro opcional
   ): void {
-    // =========================
-    // TOTAL
-    // =========================
-
-    // 💡 Determinamos el símbolo de la moneda dinámicamente
     const esDolar = moneda?.toUpperCase().trim() === 'USD';
     const simbolo = esDolar ? '$' : 'S/';
     const fechaActual = new Date().toLocaleDateString('es-PE');
+
+    // 💡 DETERMINAR NÚMERO DE COTIZACIÓN
+    let nroCotizacion = '';
+    if (nroCotizacionPersonalizado) {
+      nroCotizacion = nroCotizacionPersonalizado;
+    } else {
+      // Si no viene uno oficial, significa que es una PREVISUALIZACIÓN temporal
+      const sufijoLista =
+        idPrecioLista !== null && idPrecioLista !== undefined
+          ? String(idPrecioLista).padStart(2, '0')
+          : 'XX';
+      nroCotizacion = `COT-XXXXX-${sufijoLista}`;
+    }
 
     const subtotal = products.reduce(
       (sum, item) => sum + item.precio_venta * item.cantidad,
       0,
     );
+
+    // 2. Calculamos el IGV sobre esa base
     const igv = subtotal * 0.18;
-    const total = subtotal + igv;
 
-    // =========================
-    // PDF
-    // =========================
+    // 3. El Total General es la suma de ambos
+    const totalGeneral = subtotal + igv;
 
-    const doc = new PDFDocument({
-      margin: 50,
-      size: 'A4',
-    });
+    const doc = new PDFDocument({ margin: 40, size: 'A4', bufferPages: true });
 
-    // =========================
-    // HEADERS
-    // =========================
-
-    res.setHeader('Content-Type', 'application/pdf');
-
-    res.setHeader('Content-Disposition', 'inline; filename=cotizacion.pdf');
+    if (res && typeof res.setHeader === 'function') {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `inline; filename=${nroCotizacion}.pdf`,
+      );
+    }
 
     doc.pipe(res);
 
-    // =========================
-    // LOGO
-    // =========================
+    // --- PALETA DE COLORES ---
+    const COLOR_PRIMARY = '#0F172A';
+    const COLOR_SECONDARY = '#475569';
+    const COLOR_LIGHT_BG = '#F8FAFC';
+    const COLOR_BORDER = '#E2E8F0';
+    const COLOR_TEXT = '#1E293B';
+    const COLOR_ACCENT = '#4F46E5';
 
-    doc.image('public/assets/logo/logo-isur.png', 50, 40, {
-      width: 120,
-    });
-
-    // =========================
-    // TITULO DERECHA
-    // =========================
-
-    doc.fontSize(28).fillColor('#1E3A5F').text('COTIZACIÓN', 350, 55, {
-      align: 'right',
-    });
-
-    // =========================
-    // INFO CLIENTE
-    // =========================
-
-    doc.moveTo(50, 140).lineTo(545, 140).strokeColor('#D1D5DB').stroke();
-
-    doc.fontSize(11).fillColor('black');
-
-    doc.text('Cotizar a: ', 50, 160);
-
-    doc.font('Helvetica-Bold').text(String(username), 120, 160);
-
-    doc.font('Helvetica').text('Correo:', 50, 180);
-
-    doc.font('Helvetica-Bold').text('ventas@isur.com', 120, 180);
-
-    doc.font('Helvetica').text('Fecha:', 400, 160);
-
-    doc.font('Helvetica-Bold').text(fechaActual, 450, 160);
-
-    doc.font('Helvetica').text('ID:', 400, 180);
-
-    doc.font('Helvetica-Bold').text(String(idPrecioLista), 450, 180);
-
-    // =========================
-    // TABLA
-    // =========================
-
-    const tableTop = 240;
-
-    const itemX = 50;
-    const codigoX = 100;
-    const descriptionX = 160;
-    const priceX = 290;
-    const cantX = 370;
-    const impX = 410;
-    const totalX = 480;
-
-    // =========================
-    // HEADER TABLA
-    // =========================
-
-    doc.rect(50, tableTop, 495, 30).fill('#1E3A5F');
-
-    doc.fillColor('white').fontSize(11).font('Helvetica-Bold');
-
-    doc.text('Item', itemX + 15, tableTop + 10);
-
-    doc.text('Codigo', codigoX, tableTop + 10);
-
-    doc.text('Descripcion', descriptionX, tableTop + 10);
-
-    doc.text('Precio Unit.', priceX, tableTop + 10);
-
-    doc.text('cant', cantX, tableTop + 10);
-
-    doc.text('Impuestos', impX, tableTop + 10);
-
-    doc.text('Total', totalX, tableTop + 10);
-
-    // =========================
-    // FILAS PRODUCTOS
-    // =========================
-
-    let positionY = tableTop + 30;
-
-    doc.font('Helvetica');
-    doc.fillColor('black');
-
-    const codigoWidth = 50;
-    const descriptionWidth = 120;
-    const priceWidth = 60;
-    const cantWidth = 40;
-    const impWidth = 50;
-    const totalWidth = 60;
-
-    products.forEach((product, index) => {
-      const rowTotal = product.precio_venta * product.cantidad;
-
-      // =========================
-      // CALCULAR ALTURA DESCRIPCIÓN
-      // =========================
-
-      const descriptionHeight = doc.heightOfString(product.nombre, {
-        width: descriptionWidth,
-      });
-
-      // ALTURA MINIMA FILA
-
-      const rowHeight = Math.max(40, descriptionHeight + 20);
-
-      // =========================
-      // LINEA SUPERIOR
-      // =========================
-
+    // 1. ENCABEZADO
+    try {
+      doc.image('public/assets/logo/logo-isur.png', 36, 28, { width: 140 });
+    } catch (e) {
       doc
-        .moveTo(50, positionY)
-        .lineTo(545, positionY)
-        .strokeColor('#E5E7EB')
-        .stroke();
+        .fillColor(COLOR_PRIMARY)
+        .font('Helvetica-Bold')
+        .fontSize(18)
+        .text('CORPORACIÓN ISUR', 40, 40);
+    }
 
-      // =========================
-      // ITEM
-      // =========================
-
-      doc.text(`${index + 1}`, itemX + 20, positionY + 10);
-
-      // =========================
-      // CODIGO
-      // =========================
-
-      doc.text(product.referencia_interna, codigoX, positionY + 10, {
-        width: codigoWidth,
-      });
-
-      // =========================
-      // DESCRIPCION
-      // =========================
-
-      doc.text(product.nombre, descriptionX, positionY + 10, {
-        width: descriptionWidth,
-      });
-
-      // =========================
-      // PRECIO
-      // =========================
-
-      doc.text(
-        `${simbolo} ${Number(product.precio_venta).toFixed(2)}`,
-        priceX,
-        positionY + 10,
-        {
-          width: priceWidth,
-        },
-      );
-
-      // =========================
-      // cant
-      // =========================
-
-      doc.text(`${product.cantidad}`, cantX, positionY + 10, {
-        width: cantWidth,
-      });
-
-      // =========================
-      // IMPUESTOS
-      // =========================
-
-      doc.text(`IGV-18%`, impX, positionY + 10, {
-        width: impWidth,
-      });
-
-      // =========================
-      // TOTAL
-      // =========================
-
-      doc.text(`${simbolo} ${rowTotal.toFixed(2)}`, totalX, positionY + 10, {
-        width: totalWidth,
-      });
-
-      // =========================
-      // SIGUIENTE FILA
-      // =========================
-
-      positionY += rowHeight;
+    doc.fillColor(COLOR_SECONDARY).font('Helvetica').fontSize(8.5);
+    doc.text('CORPORACIÓN ISUR S.R.L.', 40, 95);
+    doc.text('Jr. Zepita Nro. 533 Int. 401a, Moquegua - Ilo', 40, 107, {
+      width: 250,
     });
+    doc.text('Contacto: ventas@isur.com  |  WhatsApp: 987 654 321', 40, 119);
 
-    // =========================
-    // LINEA FINAL TABLA
-    // =========================
+    const boxWidth = 200;
+    const boxHeight = 72;
+    const boxX = 355;
+    const boxY = 40;
 
+    doc.rect(boxX, boxY, boxWidth, boxHeight).fill(COLOR_LIGHT_BG);
     doc
-      .moveTo(50, positionY)
-      .lineTo(545, positionY)
-      .strokeColor('#E5E7EB')
+      .rect(boxX, boxY, boxWidth, boxHeight)
+      .strokeColor(COLOR_PRIMARY)
+      .lineWidth(1.5)
       .stroke();
 
-    // =========================
-    // TOTALES
-    // =========================
-
-    const totalsY = positionY + 40;
-
-    doc.font('Helvetica').fontSize(11);
-
-    doc.text('Sub Total:', 380, totalsY);
-
-    doc.text(`${simbolo} ${subtotal.toFixed(2)}`, 480, totalsY);
-
-    doc.text('IGV (18%):', 380, totalsY + 25);
-
-    doc.text(`${simbolo} ${igv.toFixed(2)}`, 480, totalsY + 25);
-
     doc
-      .moveTo(380, totalsY + 50)
-      .lineTo(545, totalsY + 50)
-      .strokeColor('#D1D5DB')
+      .fillColor(COLOR_PRIMARY)
+      .font('Helvetica-Bold')
+      .fontSize(11)
+      .text('R.U.C. 20532435847', boxX, boxY + 14, {
+        align: 'center',
+        width: boxWidth,
+      })
+      .text('COTIZACIÓN DE VENTA', boxX, boxY + 33, {
+        align: 'center',
+        width: boxWidth,
+      })
+      .fillColor(COLOR_ACCENT)
+      .text(nroCotizacion, boxX, boxY + 52, {
+        align: 'center',
+        width: boxWidth,
+      });
+
+    // 2. BLOQUE DE DATOS DEL CLIENTE
+    const clientY = 145;
+    doc
+      .moveTo(40, clientY)
+      .lineTo(555, clientY)
+      .strokeColor(COLOR_BORDER)
       .lineWidth(1)
       .stroke();
 
-    doc.font('Helvetica-Bold').fontSize(14);
+    doc
+      .fillColor(COLOR_PRIMARY)
+      .font('Helvetica-Bold')
+      .fontSize(9)
+      .text('DATOS DEL DESTINATARIO', 40, clientY + 12);
+    doc
+      .fillColor(COLOR_TEXT)
+      .font('Helvetica-Bold')
+      .fontSize(11)
+      .text(
+        String(username || 'CLIENTE GENÉRICO').toUpperCase(),
+        40,
+        clientY + 26,
+        {
+          width: 350,
+          height: 14,
+          ellipsis: true,
+        },
+      );
 
-    doc.text('Total:', 380, totalsY + 60);
+    doc.font('Helvetica').fontSize(8.5).fillColor(COLOR_SECONDARY);
+    let currentInfoY = clientY + 41;
 
-    doc.text(`${simbolo} ${total.toFixed(2)}`, 480, totalsY + 60);
+    if (numeroDocumento) {
+      doc.text(
+        `${tipoDocumento || 'DOCUMENTO'}: ${numeroDocumento}`,
+        40,
+        currentInfoY,
+      );
+      currentInfoY += 13;
+    }
+    if (direccion) {
+      doc.text(`Dirección: ${direccion}`, 40, currentInfoY, {
+        width: 260,
+        height: 10,
+        ellipsis: true,
+      });
+      currentInfoY += 13;
+    }
+    if (email) {
+      doc.text(`Email: ${email}`, 40, currentInfoY);
+    }
 
-    // =========================
-    // FOOTER
-    // =========================
+    const infoX = 400;
+    doc.font('Helvetica').fontSize(8.5).fillColor(COLOR_TEXT);
+    doc.text('Fecha Emisión:', infoX, clientY + 26);
+    doc
+      .font('Helvetica-Bold')
+      .text(fechaActual, 455, clientY + 26, { align: 'right', width: 100 });
 
-    doc.fontSize(10).font('Helvetica').fillColor('#6B7280');
+    if (solicitante) {
+      doc.font('Helvetica').text('Solicitante:', infoX, clientY + 39);
+      doc
+        .font('Helvetica-Bold')
+        .fillColor(COLOR_ACCENT)
+        .text(String(solicitante), 435, clientY + 39, {
+          align: 'right',
+          width: 120,
+        });
+    }
 
-    doc.text('Gracias por su preferencia.', 50, 720);
+    // 3. TABLA DE ITEMS
+    const tableTop = 235;
+    const colX = {
+      item: 40,
+      codigo: 80,
+      desc: 165,
+      cant: 360,
+      unit: 405,
+      total: 465,
+    };
+    const colWidth = {
+      item: 30,
+      codigo: 85,
+      desc: 195,
+      cant: 55,
+      unit: 70,
+      total: 80,
+    };
 
-    doc.text('ISUR - Sistemas de Cotización', 50, 740);
+    doc.rect(40, tableTop, 515, 22).fill(COLOR_PRIMARY);
+    doc.fillColor('white').fontSize(8).font('Helvetica-Bold');
+    doc.text('ITEM', colX.item, tableTop + 7, {
+      align: 'center',
+      width: colWidth.item,
+    });
+    doc.text('CÓDIGO', colX.codigo, tableTop + 7);
+    doc.text('DESCRIPCIÓN DEL PRODUCTO', colX.desc, tableTop + 7);
+    doc.text('CANT.', colX.cant, tableTop + 7, {
+      align: 'center',
+      width: colWidth.cant,
+    });
+    doc.text('P. UNIT', colX.unit, tableTop + 7, {
+      align: 'right',
+      width: colWidth.unit,
+    });
+    doc.text('TOTAL', colX.total, tableTop + 7, {
+      align: 'right',
+      width: colWidth.total,
+    });
 
-    // =========================
-    // FINALIZAR
-    // =========================
+    let positionY = tableTop + 22;
+
+    products.forEach((product, index) => {
+      const rowTotal = product.precio_venta * product.cantidad;
+      const descriptionHeight = doc.heightOfString(product.nombre, {
+        width: colWidth.desc,
+      });
+      const rowHeight = Math.max(25, descriptionHeight + 10);
+
+      if (positionY + rowHeight > 710) {
+        doc.addPage();
+        positionY = 40;
+        doc.rect(40, positionY, 515, 22).fill(COLOR_PRIMARY);
+        doc.fillColor('white').font('Helvetica-Bold').fontSize(8);
+        doc.text('ITEM', colX.item, positionY + 7, {
+          align: 'center',
+          width: colWidth.item,
+        });
+        doc.text('CÓDIGO', colX.codigo, positionY + 7);
+        doc.text('DESCRIPCIÓN DEL PRODUCTO', colX.desc, positionY + 7);
+        doc.text('CANT.', colX.cant, positionY + 7, {
+          align: 'center',
+          width: colWidth.cant,
+        });
+        doc.text('P. UNIT', colX.unit, positionY + 7, {
+          align: 'right',
+          width: colWidth.unit,
+        });
+        doc.text('TOTAL', colX.total, positionY + 7, {
+          align: 'right',
+          width: colWidth.total,
+        });
+        positionY += 22;
+      }
+
+      if (index % 2 === 0) {
+        doc.rect(40, positionY, 515, rowHeight).fill(COLOR_LIGHT_BG);
+      }
+
+      doc.fillColor(COLOR_TEXT).font('Helvetica').fontSize(8.5);
+      doc.text(
+        `${String(index + 1).padStart(2, '0')}`,
+        colX.item,
+        positionY + 7,
+        { align: 'center', width: colWidth.item },
+      );
+      doc
+        .font('Helvetica-Bold')
+        .text(product.referencia_interna || 'S/C', colX.codigo, positionY + 7, {
+          width: colWidth.codigo,
+          height: 10,
+          ellipsis: true,
+        });
+      doc.font('Helvetica').text(product.nombre, colX.desc, positionY + 7, {
+        width: colWidth.desc,
+      });
+      doc.text(`${product.cantidad}`, colX.cant, positionY + 7, {
+        align: 'center',
+        width: colWidth.cant,
+      });
+      doc.text(
+        `${simbolo} ${Number(product.precio_venta).toFixed(2)}`,
+        colX.unit,
+        positionY + 7,
+        { align: 'right', width: colWidth.unit },
+      );
+      doc
+        .font('Helvetica-Bold')
+        .text(`${simbolo} ${rowTotal.toFixed(2)}`, colX.total, positionY + 7, {
+          align: 'right',
+          width: colWidth.total,
+        });
+
+      doc
+        .moveTo(40, positionY + rowHeight)
+        .lineTo(555, positionY + rowHeight)
+        .strokeColor(COLOR_BORDER)
+        .lineWidth(0.5)
+        .stroke();
+      positionY += rowHeight;
+    });
+
+    // 4. PIE DE COMPROBANTE
+    let bottomY = positionY + 25;
+    if (bottomY > 630) {
+      doc.addPage();
+      bottomY = 40;
+    }
+
+    doc.rect(40, bottomY, 280, 75).fill(COLOR_LIGHT_BG);
+    doc
+      .rect(40, bottomY, 280, 75)
+      .strokeColor(COLOR_BORDER)
+      .lineWidth(0.5)
+      .stroke();
+
+    doc
+      .fillColor(COLOR_PRIMARY)
+      .font('Helvetica-Bold')
+      .fontSize(8)
+      .text('CONDICIONES COMERCIALES', 48, bottomY + 8);
+    const terminos = [
+      '• Los precios incluyen el Impuesto General a las Ventas (IGV 18%).',
+      '• Vigencia de la proforma: 7 días calendario.',
+      '• El stock está sujeto a variación hasta confirmar la orden.',
+      '• Pagos mediante transferencias bancarias o aplicativos digitales.',
+    ];
+    let termY = bottomY + 21;
+    doc.fillColor(COLOR_SECONDARY).font('Helvetica').fontSize(7.2);
+    terminos.forEach((line) => {
+      doc.text(line, 48, termY, { width: 265 });
+      termY += 11;
+    });
+
+    const totalsX_Label = 350;
+    const totalsX_Value = 455;
+    const totalsWidth_Value = 100;
+
+    doc.fillColor(COLOR_TEXT).font('Helvetica').fontSize(8.5);
+    doc.text('Op. Gravada (Sub Total):', totalsX_Label, bottomY + 5);
+    doc.text(`${simbolo} ${subtotal.toFixed(2)}`, totalsX_Value, bottomY + 5, {
+      align: 'right',
+      width: totalsWidth_Value,
+    });
+
+    doc.text('I.G.V. (18%):', totalsX_Label, bottomY + 20);
+    doc.text(`${simbolo} ${igv.toFixed(2)}`, totalsX_Value, bottomY + 20, {
+      align: 'right',
+      width: totalsWidth_Value,
+    });
+
+    doc
+      .moveTo(totalsX_Label, bottomY + 36)
+      .lineTo(555, bottomY + 36)
+      .strokeColor(COLOR_BORDER)
+      .lineWidth(0.5)
+      .stroke();
+
+    doc
+      .fillColor(COLOR_PRIMARY)
+      .font('Helvetica-Bold')
+      .fontSize(11)
+      .text('TOTAL GENERAL:', totalsX_Label, bottomY + 45);
+    doc.text(
+      `${simbolo} ${totalGeneral.toFixed(2)}`,
+      totalsX_Value,
+      bottomY + 45,
+      { align: 'right', width: totalsWidth_Value },
+    );
+
+    // 5. MARGEN Y PIE DE PÁGINA DINÁMICO
+    const pages = doc.bufferedPageRange();
+    for (let i = 0; i < pages.count; i++) {
+      doc.switchToPage(i);
+      doc
+        .moveTo(40, 755)
+        .lineTo(555, 755)
+        .strokeColor(COLOR_BORDER)
+        .lineWidth(0.5)
+        .stroke();
+
+      doc.fontSize(7.5).font('Helvetica').fillColor(COLOR_SECONDARY);
+      doc.text(
+        'Si está de acuerdo con los suministros descritos, responda a este documento adjuntando su comprobante.',
+        40,
+        764,
+      );
+      doc.text(
+        'ISUR - Sistema Automatizado de Cotizaciones Corporativas',
+        40,
+        775,
+      );
+      doc.text(`Página ${i + 1} de ${pages.count}`, 495, 764, {
+        align: 'right',
+        width: 60,
+      });
+    }
 
     doc.end();
   }

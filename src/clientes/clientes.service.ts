@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Cliente } from './entities/cliente.entity';
+import * as bcrypt from 'bcrypt'; // 1. Importar bcrypt
 
 @Injectable()
 export class ClientesService {
@@ -36,5 +37,32 @@ export class ClientesService {
     return {
       message: 'Cliente eliminado',
     };
+  }
+
+  async update(id: number, updateClienteDto: Partial<Cliente>) {
+    const cliente = await this.findOne(id);
+    if (!cliente) {
+      throw new NotFoundException(`Cliente con ID ${id} no encontrado`);
+    }
+
+    // 1. Filtrar: Solo si password tiene contenido real y no es solo espacios
+    if (
+      updateClienteDto.password &&
+      updateClienteDto.password.trim().length > 0
+    ) {
+      const saltRounds = 12;
+      updateClienteDto.password = await bcrypt.hash(
+        updateClienteDto.password,
+        saltRounds,
+      );
+    } else {
+      // 2. Si es nulo o vacío, eliminamos la propiedad del DTO
+      // para que Object.assign NO la sobrescriba en la entidad
+      delete updateClienteDto.password;
+    }
+
+    // 3. Fusionamos solo las propiedades que quedaron en el DTO
+    Object.assign(cliente, updateClienteDto);
+    return this.clienteRepository.save(cliente);
   }
 }

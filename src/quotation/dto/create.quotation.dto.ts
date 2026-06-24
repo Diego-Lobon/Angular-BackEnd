@@ -21,13 +21,32 @@ export class CreateQuotationDto {
   @IsString()
   moneda!: string;
 
-  // NUEVO
   @IsOptional()
   @IsString()
   username!: string;
 
-  // NUEVO
   @IsOptional()
   @IsNumber()
   id_precio_lista!: number;
+
+  // 💡 NUEVOS ATRIBUTOS DEL FORMULARIO
+  @IsOptional()
+  @IsString()
+  tipo_documento?: string;
+
+  @IsOptional()
+  @IsString()
+  numero_documento?: string;
+
+  @IsOptional()
+  @IsString()
+  direccion?: string;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  solicitante?: string;
 }

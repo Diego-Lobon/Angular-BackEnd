@@ -8,6 +8,12 @@ export class Cliente {
   @Column({ length: 100 })
   nombre!: string;
 
+  @Column({ length: 100 })
+  username!: string;
+
+  @Column()
+  password!: string;
+
   @Column({
     length: 50,
     nullable: true,

@@ -1,23 +1,24 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config'; // 1. Importar
 import Redis from 'ioredis';
 
 @Injectable()
 export class RedisService implements OnModuleDestroy {
   private readonly redisClient: Redis;
 
-  constructor() {
+  // 2. Inyectar ConfigService
+  constructor(private configService: ConfigService) {
     this.redisClient = new Redis({
-      host: 'localhost',
-      port: 6379,
+      host: this.configService.get<string>('REDIS_HOST'),
+      port: this.configService.get<number>('REDIS_PORT'),
     });
   }
 
-  // Devolvemos el cliente por si necesitas comandos ultra específicos en el futuro
+  // ... el resto de tus métodos (getClient, set, get, del) se mantienen igual
   getClient(): Redis {
     return this.redisClient;
   }
 
-  // Guardar datos con un tiempo de vida (TTL) configurable de forma simple
   async set(
     key: string,
     value: any,
@@ -26,7 +27,6 @@ export class RedisService implements OnModuleDestroy {
     await this.redisClient.set(key, JSON.stringify(value), 'EX', ttlSeconds);
   }
 
-  // FIX DEL ERROR ROJO: Validamos explícitamente que 'data' sea un string antes de parsear
   async get<T>(key: string): Promise<T | null> {
     const data = await this.redisClient.get(key);
     if (!data) return null;

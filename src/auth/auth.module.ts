@@ -8,14 +8,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 
-import { User } from './entities/auth.entity';
+import { User, TipoUsuario } from './entities/auth.entity';
 
 @Module({
   imports: [
     PassportModule,
-
-    TypeOrmModule.forFeature([User]),
-
+    TypeOrmModule.forFeature([User, TipoUsuario]), // <-- Agrega TipoUsuario aquí
     JwtModule.register({
       secret: 'SECRET_KEY',
       signOptions: {
@@ -23,11 +21,8 @@ import { User } from './entities/auth.entity';
       },
     }),
   ],
-
   controllers: [AuthController],
-
   providers: [AuthService],
-
   exports: [JwtModule],
 })
 export class AuthModule {}
