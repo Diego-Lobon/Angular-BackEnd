@@ -151,7 +151,7 @@ export class QuotationService {
     return {
       ...cotizacionFinal,
       // Agregamos la URL completa para que el frontend no tenga que adivinar
-      full_pdf_url: `http://192.168.18.38:3000${cotizacionFinal.pdf_url}`,
+      full_pdf_url: `${process.env.APP_URL}${cotizacionFinal.pdf_url}`,
     };
   }
 
